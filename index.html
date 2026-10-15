@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>K&Z Realtors Portal</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--tx:#1b2430;--mut:#667085;--bd:#e3e7ee;--ac:#0f6e56;--acx:#e1f5ee;--red:#c0302b;--redx:#fdeceb;--amb:#b7791f;--ambx:#fdf3dc;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--card:#1b222b;--tx:#e8ecf1;--mut:#9aa5b4;--bd:#2c3642;--ac:#4cc9a0;--acx:#12372d;--red:#ff7b74;--redx:#3a1a19;--amb:#f2b84b;--ambx:#3a2e12}}
+:root[data-theme="dark"]{--bg:#12161c;--card:#1b222b;--tx:#e8ecf1;--mut:#9aa5b4;--bd:#2c3642;--ac:#4cc9a0;--acx:#12372d;--red:#ff7b74;--redx:#3a1a19;--amb:#f2b84b;--ambx:#3a2e12}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--card);border-bottom:1px solid var(--bd);padding:12px 16px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+header h1{margin:0;font-size:18px}header small{color:var(--mut)}
+nav{display:flex;gap:6px;overflow-x:auto;padding:10px 12px;background:var(--bg);position:sticky;top:calc(env(safe-area-inset-top,0px) + 58px);z-index:4}
+nav button{white-space:nowrap}
+main{max-width:1150px;margin:0 auto;padding:12px 14px 40px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:14px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.stat{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}.stat b{display:block;font-size:20px}.stat span{color:var(--mut);font-size:12px}
+button,select,input,textarea{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:7px 10px;min-height:38px}
+button{cursor:pointer}button.p{background:var(--ac);color:var(--card);border-color:var(--ac);font-weight:600}
+nav button.on{background:var(--ac);color:var(--card);border-color:var(--ac)}
+.wa{background:#25d366;color:#05260f;border-color:#25d366;font-weight:600}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.tbl{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:640px}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd);font-size:14px;vertical-align:top}th{color:var(--mut);font-size:12px;text-transform:uppercase}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;background:var(--acx);color:var(--ac)}.tag.r{background:var(--redx);color:var(--red)}.tag.a{background:var(--ambx);color:var(--amb)}
+.alert{background:var(--redx);color:var(--red);border:1px solid var(--red);border-radius:10px;padding:10px;margin-bottom:10px;font-weight:600}
+.form{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}.form label{font-size:12px;color:var(--mut);display:flex;flex-direction:column;gap:3px}
+dialog{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--tx);max-width:420px;width:92%}
+textarea{width:100%;min-height:120px}h2{margin:0 0 10px;font-size:16px}.mut{color:var(--mut);font-size:13px}.neg{color:var(--red)}
+#printArea{display:none}
+@media print{body>*:not(#printArea){display:none!important}#printArea{display:block;color:#000;background:#fff;padding:10px}}
+</style></head><body>
+<header><h1>K&amp;Z Realtors — Management Portal</h1><small>Partners: Kabeer Ghaffar &amp; Zeeshan · 50/50</small>
+<div class="row" style="margin:8px 0 0"><button class="p" onclick="xlExport()">⬇ Excel Export (.xlsx)</button><button onclick="document.getElementById('xf').click()">⬆ Excel Import</button><button onclick="syncLoad()">⟳ Load from Sheet</button><button onclick="syncPush()">⬆ Save to Sheet</button><button onclick="syncCfg()">⚙ Sync Settings</button><span class="mut" id="xmsg"></span><input type="file" id="xf" accept=".xlsx,.xls" hidden onchange="xlImport(this)"></div></header>
+<nav id="nav"></nav><main id="main"></main>
+<dialog id="dlg"><div id="dlgBody"></div></dialog><div id="printArea"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const AREAS=["Civil Lines","Bath Island",...Array.from({length:9},(_,i)=>"Clifton Block "+(i+1)),"Khaliq-uz-Zaman Road","Ziauddin Ahmed Road","Bahadurabad","PECHS","Tariq Road"];
+const CATS=["Flat","Bungalow","Plot","Portion"],STAT=["Available","Reserved","Sold","Rented"];
+const today=()=>new Date().toISOString().slice(0,10);
+const fmt=n=>"PKR "+Math.round(n||0).toLocaleString("en-US");
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const seed={inv:[
+{id:"KNZ-INV-001",type:"Bungalow",listing:"Sale",area:"Clifton Block 5",size:"500 Sq Yds",price:85000000,owner:"Salim Bhai 0300-0000001",status:"Available"},
+{id:"KNZ-INV-002",type:"Flat",listing:"Rent",area:"Bahadurabad",size:"1800 Sq Ft",price:95000,owner:"Owner 0321-0000002",status:"Available"},
+{id:"KNZ-INV-003",type:"Plot",listing:"Sale",area:"PECHS",size:"240 Sq Yds",price:48000000,owner:"Owner 0333-0000003",status:"Available"}],
+deals:[{id:"D-001",prop:"Prime Residency House",kind:"Sale",client:"Mr. Imran",value:100000000,comm:2000000,brokers:"Kabeer",paid100:false,title:false,leased:false,date:today()}],
+cash:[{d:today(),cat:"Chai/Food",desc:"Daily food & tea",amt:2000},{d:today(),cat:"Petrol",desc:"Tariq field allowance",amt:300}],
+sched:[{id:"S-001",client:"Mr. Imran",prop:"Prime Residency (Seller: Salim Bhai)",label:"Token received",amt:1000000,due:"2026-09-15",paid:true},{id:"S-002",client:"Mr. Imran",prop:"Prime Residency (Seller: Salim Bhai)",label:"Installment",amt:10000000,due:"2026-10-20",paid:false}],
+set:{days:26,webhook:"",phone:"",wa:""}};
+let S;try{S=JSON.parse(localStorage.getItem("kz")||"null")}catch(e){}S=S||seed;
+const save=()=>{try{localStorage.setItem("kz",JSON.stringify(S))}catch(e){}};
+let tab="inv",fl={listing:"Sale",cat:"",area:""};
+const TABS=[["inv","Inventory"],["dash","Dashboard"],["cash","Cash Book"],["sched","Client Schedules"],["split","Broker Splits"],["eq","Partner Equity"]];
+function exp(){const d=+S.set.days||26;return[["Office Rent",80000],["Tariq (Surveyor base)",30000],["Tariq petrol (PKR 300 × "+d+" days)",300*d],["Nasir (Office Boy)",20000],["Humayun (Marketing) — unpaid liability",22000],["Graphic Designer (amortized)",12500],["Food & Tea (PKR 2,000 × "+d+" days)",2000*d],["Electricity",5708]]}
+const expTot=()=>exp().reduce((a,b)=>a+b[1],0);
+const recog=d=>d.kind==="Sale"?(d.paid100&&d.title):d.leased;
+const rev=()=>S.deals.filter(recog).reduce((a,d)=>a+d.comm/2,0);
+function wa(txt,ph){window.open("https://wa.me/"+(ph||"").replace(/\D/g,"")+"?text="+encodeURIComponent(txt),"_blank")}
+function activeInv(){return S.inv.filter(p=>p.status==="Available")}
+function bcast(){let t="*K&Z REALTORS — ACTIVE INVENTORY*\n"+new Date().toDateString()+"\n";
+for(const l of ["Sale","Rent"]){const ls=activeInv().filter(p=>p.listing===l);if(!ls.length)continue;t+="\n====== FOR "+l.toUpperCase()+" ======\n";
+for(const c of CATS){const g=ls.filter(p=>p.type===c);if(!g.length)continue;t+="\n*"+c.toUpperCase()+"S*\n";g.forEach(p=>t+="• "+p.id+" | "+p.area+" | "+p.size+" | "+fmt(p.price)+(l==="Rent"?"/mo":"")+"\n")}}
+return t+"\nCall K&Z Realtors for details."}
+function nextId(){const n=S.inv.reduce((m,p)=>Math.max(m,+p.id.split("-").pop()),0)+1;return"KNZ-INV-"+String(n).padStart(3,"0")}
+function opts(a,v){return a.map(x=>`<option ${x===v?"selected":""}>${x}</option>`).join("")}
+function render(){document.getElementById("nav").innerHTML=TABS.map(t=>`<button class="${t[0]===tab?"on":""}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join("");
+document.getElementById("main").innerHTML=V[tab]();save()}
+const V={};
+V.inv=()=>{const rows=S.inv.filter(p=>p.listing===fl.listing&&(!fl.cat||p.type===fl.cat)&&(!fl.area||p.area===fl.area));
+const act=rows.filter(p=>p.status!=="Sold"&&p.status!=="Rented"),arc=rows.filter(p=>p.status==="Sold"||p.status==="Rented");
+const tr=(p,a)=>`<tr><td>${p.id}</td><td>${p.type}</td><td>${esc(p.area)}</td><td>${esc(p.size)}</td><td>${fmt(p.price)}</td><td>${esc(p.owner)}</td><td>${a?`<select onchange="setStatus('${p.id}',this.value)">${opts(STAT,p.status)}</select>`:`<span class="tag r">${p.status}</span>`}</td></tr>`;
+return`<div class="card"><div class="row"><button class="${fl.listing==="Sale"?"p":""}" onclick="fl.listing='Sale';render()">For Sale</button><button class="${fl.listing==="Rent"?"p":""}" onclick="fl.listing='Rent';render()">For Rent</button>
+<select onchange="fl.cat=this.value;render()"><option value="">All categories</option>${opts(CATS,fl.cat)}</select><select onchange="fl.area=this.value;render()"><option value="">All areas</option>${opts(AREAS,fl.area)}</select></div>
+<div class="row"><button class="p" onclick="pdfInv()">Generate Active Inventory PDF / Text</button><button class="wa" onclick="waInv()">Send Inventory to WhatsApp Group</button><button onclick="hook()">Zapier / Make Webhook</button></div></div>
+<div class="card"><h2>Add property</h2><div class="form" id="addf"><label>Type<select id="n_t">${opts(CATS)}</select></label><label>Listing<select id="n_l">${opts(["Sale","Rent"],fl.listing)}</select></label><label>Area<select id="n_a">${opts(AREAS)}</select></label><label>Size<input id="n_s" placeholder="240 Sq Yds"></label><label>Demand / Price (PKR)<input id="n_p" type="number"></label><label>Owner / Contact<input id="n_o"></label><label>&nbsp;<button class="p" onclick="addProp()">Add (${nextId()})</button></label></div></div>
+<div class="card"><h2>Active inventory — ${fl.listing==="Sale"?"For Sale":"For Rent"} (${act.length})</h2><div class="tbl"><table><tr><th>ID</th><th>Type</th><th>Area</th><th>Size</th><th>Demand</th><th>Owner</th><th>Status</th></tr>${act.map(p=>tr(p,1)).join("")||'<tr><td colspan=7 class="mut">No active listings.</td></tr>'}</table></div></div>
+<div class="card"><h2>Archive — Sold / Rented (hidden from buyers)</h2><div class="tbl"><table><tr><th>ID</th><th>Type</th><th>Area</th><th>Size</th><th>Price</th><th>Owner</th><th>Status</th></tr>${arc.map(p=>tr(p,0)).join("")||'<tr><td colspan=7 class="mut">Nothing archived.</td></tr>'}</table></div></div>`};
+function addProp(){const g=i=>document.getElementById(i).value;if(!g("n_s")||!g("n_p")){alert("Enter size and price");return}
+S.inv.push({id:nextId(),type:g("n_t"),listing:g("n_l"),area:g("n_a"),size:g("n_s"),price:+g("n_p"),owner:g("n_o"),status:"Available"});fl.listing=g("n_l");render()}
+function modal(h){document.getElementById("dlgBody").innerHTML=h;const d=document.getElementById("dlg");if(!d.open)d.showModal()}
+const closeM=()=>document.getElementById("dlg").close();
+function setStatus(id,v){const p=S.inv.find(x=>x.id===id);if(v==="Sold"||v==="Rented"){
+const need=p.listing==="Sale"?v==="Sold":v==="Rented";
+modal(`<h2>${p.id} → ${v}</h2><p class="mut">Property will be archived and a deal created in Broker Splits (K&amp;Z 50% house share).</p><div class="form" style="grid-template-columns:1fr"><label>Client / Buyer / Tenant<input id="m_c"></label><label>Deal value (PKR)<input id="m_v" type="number" value="${p.price}"></label><label>Total commission (PKR)<input id="m_m" type="number" value="${p.listing==="Sale"?Math.round(p.price*.02):p.price}"></label><label>Deal broker(s)<input id="m_b" placeholder="Kabeer, Zeeshan"></label></div><div class="row" style="margin-top:12px"><button class="p" onclick="confirmDeal('${id}','${v}')">Confirm</button><button onclick="closeM();render()">Cancel</button></div>`);return}
+p.status=v;render()}
+function confirmDeal(id,v){const p=S.inv.find(x=>x.id===id),g=i=>document.getElementById(i).value;p.status=v;
+S.deals.push({id:"D-"+String(S.deals.length+1).padStart(3,"0"),prop:p.id+" "+p.type+", "+p.area,kind:p.listing,client:g("m_c")||"—",value:+g("m_v"),comm:+g("m_m"),brokers:g("m_b")||"—",paid100:false,title:false,leased:false,date:today()});closeM();tab="split";render()}
+function pdfInv(){const t=bcast();document.getElementById("printArea").innerHTML="<pre style='white-space:pre-wrap;font:14px/1.5 sans-serif'>"+esc(t.replace(/\*/g,""))+"</pre>";
+modal(`<h2>Active Inventory Summary</h2><textarea id="ta" readonly>${esc(t)}</textarea><div class="row" style="margin-top:10px"><button class="p" onclick="closeM();setTimeout(()=>window.print(),100)">Print / Save as PDF</button><button onclick="navigator.clipboard.writeText(document.getElementById('ta').value).catch(()=>{document.getElementById('ta').select()})">Copy text</button><button onclick="closeM()">Close</button></div>`)}
+function waInv(){wa(bcast(),"")}
+function hook(){const pl={event:"weekly_active_inventory",company:"K&Z Realtors",generated_at:new Date().toISOString(),schedule:"weekly",count:activeInv().length,whatsapp_group_invite:S.set.wa,format:"pdf_email",properties:activeInv(),text_summary:bcast()};
+modal(`<h2>Weekly automation (Zapier / Make)</h2><p class="mut">Create a Schedule trigger (weekly) → Webhooks → Catch Hook, then paste its URL. The payload below is POSTed; use it to generate the PDF and email it to the group address.</p><label class="mut">Webhook URL<input id="h_u" style="width:100%" value="${esc(S.set.webhook)}"></label><label class="mut">WhatsApp group invite link<input id="h_w" style="width:100%" value="${esc(S.set.wa)}"></label><textarea readonly style="margin-top:8px">${esc(JSON.stringify(pl,null,1))}</textarea><div class="row"><button class="p" onclick="fire()">Save &amp; send test payload</button><button onclick="closeM()">Close</button></div><p class="mut" id="h_r"></p>`)}
+async function fire(){S.set.webhook=document.getElementById("h_u").value;S.set.wa=document.getElementById("h_w").value;save();const r=document.getElementById("h_r");
+if(!S.set.webhook){r.textContent="Saved. Add a webhook URL to send.";return}
+try{await fetch(S.set.webhook,{method:"POST",mode:"no-cors",body:JSON.stringify({event:"weekly_active_inventory",properties:activeInv(),text_summary:bcast()})});r.textContent="Request sent."}catch(e){r.textContent="Could not send from this page (network blocked). Copy the payload into Zapier/Make instead."}}
+V.dash=()=>{const e=expTot(),r=rev(),od=S.sched.filter(s=>!s.paid&&s.due<today()),soon=S.sched.filter(s=>!s.paid&&s.due>=today()&&s.due<=new Date(Date.now()+7*864e5).toISOString().slice(0,10));
+const pend=S.deals.filter(d=>!recog(d)).reduce((a,d)=>a+d.comm/2,0);
+return`${od.map(s=>`<div class="alert">⚠ OVERDUE: ${esc(s.client)} — ${esc(s.label)} ${fmt(s.amt)} was due ${s.due}</div>`).join("")}${soon.map(s=>`<div class="alert" style="background:var(--ambx);color:var(--amb);border-color:var(--amb)">Due soon: ${esc(s.client)} — ${fmt(s.amt)} on ${s.due}</div>`).join("")}<div class="alert" style="background:var(--ambx);color:var(--amb);border-color:var(--amb)">Unpaid liability: Humayun (Marketing) PKR 22,000</div>
+<div class="grid"><div class="stat"><span>K&amp;Z house revenue (recognized)</span><b>${fmt(r)}</b></div><div class="stat"><span>Monthly operating expenses</span><b>${fmt(e)}</b></div><div class="stat"><span>Net profit</span><b class="${r-e<0?"neg":""}">${fmt(r-e)}</b></div><div class="stat"><span>Pending house commission</span><b>${fmt(pend)}</b></div><div class="stat"><span>Active listings</span><b>${activeInv().length}</b></div></div>
+<div class="card" style="margin-top:14px"><h2>Expense breakdown (monthly)</h2>${exp().map(x=>`<div class="row" style="justify-content:space-between;margin:0;border-bottom:1px solid var(--bd);padding:6px 0"><span>${x[0]}</span><b>${fmt(x[1])}</b></div>`).join("")}<p class="mut">Tariq's PKR 28,000 advance is recovered at month-end (cash timing, not an expense). Working days: <input type="number" style="width:70px" value="${S.set.days}" onchange="S.set.days=this.value;render()"></p></div>`};
+V.cash=()=>{const tot=S.cash.reduce((a,c)=>a+c.amt,0);
+return`<div class="card"><h2>New entry</h2><div class="form"><label>Date<input id="c_d" type="date" value="${today()}"></label><label>Category<select id="c_c">${opts(["Chai/Food","Petrol","Utilities","Salaries","Office Rent","Other"])}</select></label><label>Description<input id="c_s"></label><label>Amount (PKR)<input id="c_a" type="number"></label><label>&nbsp;<button class="p" onclick="addCash()">Add</button></label></div></div>
+<div class="card"><h2>Ledger — total ${fmt(tot)}</h2><div class="tbl"><table><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th></th></tr>${S.cash.map((c,i)=>`<tr><td>${c.d}</td><td>${c.cat}</td><td>${esc(c.desc)}</td><td>${fmt(c.amt)}</td><td><button onclick="S.cash.splice(${i},1);render()">✕</button></td></tr>`).join("")}</table></div></div>`};
+function addCash(){const g=i=>document.getElementById(i).value;if(!+g("c_a"))return;S.cash.unshift({d:g("c_d"),cat:g("c_c"),desc:g("c_s"),amt:+g("c_a")});render()}
+V.sched=()=>`<div class="card"><h2>Add schedule item</h2><div class="form"><label>Client<input id="s_c"></label><label>Property<input id="s_p"></label><label>Label<input id="s_l" value="Installment"></label><label>Amount<input id="s_a" type="number"></label><label>Due<input id="s_d" type="date"></label><label>&nbsp;<button class="p" onclick="addSched()">Add</button></label></div></div>
+<div class="card"><div class="tbl"><table><tr><th>Client</th><th>Property</th><th>Item</th><th>Amount</th><th>Due</th><th>Status</th><th></th></tr>${S.sched.map((s,i)=>{const od=!s.paid&&s.due<today();return`<tr><td>${esc(s.client)}</td><td>${esc(s.prop)}</td><td>${esc(s.label)}</td><td>${fmt(s.amt)}</td><td class="${od?"neg":""}">${s.due}</td><td>${s.paid?'<span class="tag">Paid</span>':od?'<span class="tag r">OVERDUE</span>':'<span class="tag a">Pending</span>'}</td><td>${s.paid?"":`<button onclick="S.sched[${i}].paid=true;render()">Mark paid</button> <button class="wa" onclick="remind(${i})">WhatsApp</button>`}</td></tr>`}).join("")}</table></div></div>`;
+function addSched(){const g=i=>document.getElementById(i).value;if(!g("s_c")||!g("s_d")||!+g("s_a"))return;S.sched.push({id:"S-"+(S.sched.length+1),client:g("s_c"),prop:g("s_p"),label:g("s_l"),amt:+g("s_a"),due:g("s_d"),paid:false});render()}
+function remind(i){const s=S.sched[i];const ph=prompt?"":"";wa(`Assalam-o-Alaikum ${s.client},\nFriendly reminder from K&Z Realtors: ${s.label} of ${fmt(s.amt)} for ${s.prop} is due on ${s.due}.\nPlease confirm payment. Thank you.`,"")}
+V.split=()=>`<div class="card"><h2>Broker splits — 50% K&amp;Z house / 50% broker(s)</h2><p class="mut">Sales commission is recognized only after 100% payment clearance and title transfer. Rentals are recognized on lease signing.</p><div class="tbl"><table><tr><th>Deal</th><th>Type</th><th>Client</th><th>Commission</th><th>K&amp;Z 50%</th><th>Broker 50%</th><th>Conditions</th><th></th></tr>${S.deals.map((d,i)=>`<tr><td>${d.id}<br><span class="mut">${esc(d.prop)}</span></td><td>${d.kind}</td><td>${esc(d.client)}</td><td>${fmt(d.comm)}</td><td>${fmt(d.comm/2)}</td><td>${fmt(d.comm/2)}<br><span class="mut">${esc(d.brokers)}</span></td><td>${d.kind==="Sale"?`<label><input type="checkbox" ${d.paid100?"checked":""} onchange="S.deals[${i}].paid100=this.checked;render()"> 100% cleared</label><br><label><input type="checkbox" ${d.title?"checked":""} onchange="S.deals[${i}].title=this.checked;render()"> Title transferred</label>`:`<label><input type="checkbox" ${d.leased?"checked":""} onchange="S.deals[${i}].leased=this.checked;render()"> Lease signed</label>`}<br>${recog(d)?'<span class="tag">Recognized</span>':'<span class="tag a">Not yet earned</span>'}</td><td><button class="wa" onclick="notice(${i})">WhatsApp</button></td></tr>`).join("")}</table></div></div>`;
+function notice(i){const d=S.deals[i];wa(`*K&Z Realtors — Commission Notice*\nDeal: ${d.id} (${d.prop})\nTotal commission: ${fmt(d.comm)}\nBroker share (50%): ${fmt(d.comm/2)} — ${d.brokers}\nK&Z house share (50%): ${fmt(d.comm/2)}\nStatus: ${recog(d)?"Earned — ready for payout":"Pending conditions"}`,"")}
+V.eq=()=>{const r=rev(),e=expTot(),n=r-e;return`<div class="card"><h2>P&amp;L Auditor</h2><div class="row" style="justify-content:space-between"><span>Total K&amp;Z house revenue</span><b>${fmt(r)}</b></div><div class="row" style="justify-content:space-between"><span>Total audited operating expenses</span><b>${fmt(e)}</b></div><div class="row" style="justify-content:space-between;border-top:1px solid var(--bd);padding-top:8px"><span>Net profit</span><b class="${n<0?"neg":""}">${fmt(n)}</b></div></div>
+<div class="grid"><div class="stat"><span>Kabeer Ghaffar (50%)</span><b class="${n<0?"neg":""}">${fmt(n/2)}</b></div><div class="stat"><span>Zeeshan (50%)</span><b class="${n<0?"neg":""}">${fmt(n/2)}</b></div></div><p class="mut">Net Profit = Total K&amp;Z House Revenue − Total Audited Operating Expenses, split equally.</p>`};
+const YN=v=>v?"Yes":"No",isY=v=>String(v).trim().toLowerCase()==="yes"||v===true;
+const xm=t=>{const e=document.getElementById("xmsg");if(e)e.textContent=t};
+async function xlExport(){if(typeof XLSX==="undefined"){xm("Excel library failed to load.");return}
+const wb=XLSX.utils.book_new(),add=(n,a)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(a),n);
+add("Inventory",S.inv.map(p=>({ID:p.id,Type:p.type,Listing:p.listing,Area:p.area,Size:p.size,Price:p.price,Owner:p.owner,Status:p.status})));
+add("Deals",S.deals.map(d=>({ID:d.id,Property:d.prop,Kind:d.kind,Client:d.client,Value:d.value,Commission:d.comm,Brokers:d.brokers,Paid100:YN(d.paid100),TitleTransferred:YN(d.title),LeaseSigned:YN(d.leased),Date:d.date})));
+add("CashBook",S.cash.map(c=>({Date:c.d,Category:c.cat,Description:c.desc,Amount:c.amt})));
+add("Schedules",S.sched.map(s=>({ID:s.id,Client:s.client,Property:s.prop,Item:s.label,Amount:s.amt,Due:s.due,Paid:YN(s.paid)})));
+const buf=XLSX.write(wb,{type:"array",bookType:"xlsx"});
+try{const fn="KZ-Realtors-Data-"+today()+".xlsx";const d=typeof claude!=="undefined"?await claude.use("downloads"):null;if(d){await d.save({filename:fn,data:buf})}else{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([buf]));a.download=fn;a.click()}xm("Saved.")}catch(e){xm(e&&e.code==="declined"?"Cancelled.":"Could not save: "+(e&&e.message||e))}}
+async function xlImport(inp){const f=inp.files[0];if(!f)return;try{const wb=XLSX.read(await f.arrayBuffer());const rd=n=>wb.Sheets[n]?XLSX.utils.sheet_to_json(wb.Sheets[n],{defval:""}):null;
+const I=rd("Inventory"),D=rd("Deals"),C=rd("CashBook"),Sc=rd("Schedules");if(!I&&!D&&!C&&!Sc){xm("No known sheets found (Inventory, Deals, CashBook, Schedules).");return}
+if(I)S.inv=I.filter(r=>r.ID).map(r=>({id:String(r.ID),type:r.Type,listing:r.Listing,area:r.Area,size:String(r.Size),price:+r.Price||0,owner:String(r.Owner),status:r.Status||"Available"}));
+if(D)S.deals=D.filter(r=>r.ID).map(r=>({id:String(r.ID),prop:String(r.Property),kind:r.Kind,client:String(r.Client),value:+r.Value||0,comm:+r.Commission||0,brokers:String(r.Brokers),paid100:isY(r.Paid100),title:isY(r.TitleTransferred),leased:isY(r.LeaseSigned),date:String(r.Date)}));
+if(C)S.cash=C.filter(r=>+r.Amount).map(r=>({d:String(r.Date),cat:String(r.Category),desc:String(r.Description),amt:+r.Amount}));
+if(Sc)S.sched=Sc.filter(r=>r.ID).map(r=>({id:String(r.ID),client:String(r.Client),prop:String(r.Property),label:String(r.Item),amt:+r.Amount||0,due:String(r.Due),paid:isY(r.Paid)}));
+render();xm("Imported "+f.name)}catch(e){xm("Import failed: "+(e&&e.message||e))}inp.value=""}
+
+let SY={};try{SY=JSON.parse(localStorage.getItem("kzsync")||"{}")}catch(e){}
+function syncCfg(){modal(`<h2>Google Sheet Sync</h2><div class="form" style="grid-template-columns:1fr"><label>Apps Script Web app URL<input id="y_u" value="${esc(SY.url||"")}"></label><label>Secret token<input id="y_t" type="password" value="${esc(SY.token||"")}"></label></div><div class="row" style="margin-top:12px"><button class="p" onclick="syncSave()">Save</button><button onclick="closeM()">Close</button></div>`)}
+function syncSave(){SY={url:document.getElementById("y_u").value.trim(),token:document.getElementById("y_t").value.trim()};try{localStorage.setItem("kzsync",JSON.stringify(SY))}catch(e){}closeM();xm("Sync settings saved.")}
+function sheetRows(){return{Inventory:S.inv.map(p=>({ID:p.id,Type:p.type,Listing:p.listing,Area:p.area,Size:p.size,Price:p.price,Owner:p.owner,Status:p.status})),
+Deals:S.deals.map(d=>({ID:d.id,Property:d.prop,Kind:d.kind,Client:d.client,Value:d.value,Commission:d.comm,Brokers:d.brokers,Paid100:YN(d.paid100),TitleTransferred:YN(d.title),LeaseSigned:YN(d.leased),Date:d.date})),
+CashBook:S.cash.map(c=>({Date:c.d,Category:c.cat,Description:c.desc,Amount:c.amt})),
+Schedules:S.sched.map(s=>({ID:s.id,Client:s.client,Property:s.prop,Item:s.label,Amount:s.amt,Due:s.due,Paid:YN(s.paid)}))}}
+async function syncLoad(){if(!SY.url){syncCfg();return}xm("Loading...");try{const r=await fetch(SY.url+"?token="+encodeURIComponent(SY.token||""));const j=await r.json();if(j.error){xm("Error: "+j.error);return}
+const I=j.Inventory,D=j.Deals,C=j.CashBook,Sc=j.Schedules;
+if(I)S.inv=I.filter(r=>r.ID).map(r=>({id:String(r.ID),type:r.Type,listing:r.Listing,area:r.Area,size:String(r.Size),price:+r.Price||0,owner:String(r.Owner),status:r.Status||"Available"}));
+if(D)S.deals=D.filter(r=>r.ID).map(r=>({id:String(r.ID),prop:String(r.Property),kind:r.Kind,client:String(r.Client),value:+r.Value||0,comm:+r.Commission||0,brokers:String(r.Brokers),paid100:isY(r.Paid100),title:isY(r.TitleTransferred),leased:isY(r.LeaseSigned),date:String(r.Date)}));
+if(C)S.cash=C.filter(r=>+r.Amount).map(r=>({d:String(r.Date),cat:String(r.Category),desc:String(r.Description),amt:+r.Amount}));
+if(Sc)S.sched=Sc.filter(r=>r.ID).map(r=>({id:String(r.ID),client:String(r.Client),prop:String(r.Property),label:String(r.Item),amt:+r.Amount||0,due:String(r.Due),paid:isY(r.Paid)}));
+render();xm("Loaded from Sheet.")}catch(e){xm("Load failed: "+(e&&e.message||e))}}
+async function syncPush(){if(!SY.url){syncCfg();return}xm("Saving...");try{const R=sheetRows();for(const n of Object.keys(R)){const r=await fetch(SY.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:SY.token,action:"replace",sheet:n,rows:R[n]})});const j=await r.json();if(j.error){xm("Error ("+n+"): "+j.error);return}}xm("Saved to Sheet.")}catch(e){xm("Save failed: "+(e&&e.message||e))}}
+render();
+</script></body></html>
